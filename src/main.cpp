@@ -1,6 +1,6 @@
 #include "downloader.h"
 
-int main()
+int main(int argc, char** argv)
 {
 	Downloader downloader;
 					
@@ -12,7 +12,8 @@ int main()
 	//rar download for content_length.
 	url.push_back("http://10.16.100.241/ftps3d6/Dual%20Audio/LALON%20GEETI.rar");
     //url.push_back("127.0.0.1/");
-	//url.push_back("http://banglasongs.fusionbd.com/downloads/download.php?file=mp3/bangla/Shomi_Ft_Project_365/02.Mon_Amar_Dehoghori.mp3");
+	//url.push_back("");
+
 
 	for (int i = 0; i < url.size(); i++)
 		downloader.download(url[i]);

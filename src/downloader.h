@@ -13,26 +13,13 @@ class Downloader : public Client
 		~Downloader();
 
 	private:
-		Parser parser;
-
-		//For show.............
-		long fileSizeShow = 0;
-		int _byte_recv = 0;
-		int _byte_write = 0;
-		long totalDownSize = 0; 
-		long _fileSize = 0;
-
 		char* body;
-		size_t index;
-
-		std::string _header;
-		std::string _fileType;
-		FILE_ENCODING _encoding;
-		std::ofstream output;
+		Parser parser;
+		Response _response;
 
 		//Functions.................
-		inline void content_length();
-		inline void chunked();
+		inline void content_length(int byte_recv);
+		inline void chunked(int byte_recv);
 		inline void cleanUp();
 };
 #endif

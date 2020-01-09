@@ -16,6 +16,7 @@ class Client
         ~Client();
 
 	protected:
+		char sendBuff[2048];
 		char recvBuff[32768];
 		long kb = 1024;
 		long mb = 1048576;
@@ -23,9 +24,12 @@ class Client
 
         int sock;
 		SSL* ssl;
-		std::string protocol;
         struct addrinfo hints;
         struct addrinfo *bind_addr;
+
+	private:
+		std::string _protocol;
+
 };
 
 

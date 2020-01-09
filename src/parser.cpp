@@ -45,12 +45,19 @@ void Parser::parseHeader(std::string header, std::string &fileType, long &fileSi
 
 
 
-void Parser::parse_url(std::string url, std::string &hostname, std::string &port, std::string &path, std::string &protocol)
+void Parser::parse_url(std::string url, std::string &hostname, std::string &port, std::string &path, std::string &protocol, std::string &filename)
 {
     std::string newUrl;
 
-	//p = number of element of ":".
-    ssize_t p = url.find("://");
+	//Get File name.
+	size_t p = url.rfind("/");
+	filename = std::string(url, p+1, url.size());
+	for(int i = 0; i < filename.size(); i++)
+		if(filename[i] == '%')
+			filename[i] = ' ';	
+
+	//Get protocol like 'http' or 'https'.
+    p = url.find("://");
 	protocol = std::string(url, 0, p);
 
     if(p > 0)
@@ -59,6 +66,7 @@ void Parser::parse_url(std::string url, std::string &hostname, std::string &port
         newUrl = url;
 
     
+	//Get hostname like youtube.com
     p = 0;
     p = newUrl.find("/");
     if(p > 0)
@@ -76,15 +84,18 @@ void Parser::parse_url(std::string url, std::string &hostname, std::string &port
         hostname = newUrl;
     
 
-    //Get hostname and port............
+    //update hostname like if we have localhost:5555
+	//Then our hostname = localhost and port = 5555
     ssize_t np = hostname.find(":");
     if(np > 0)
     {
         hostname.assign(hostname, 0, np);
         port.assign(hostname, np+1, hostname.size()+1);
     }
-    else
-        port = "80";
+	else
+		port = "80";
+
+
 }
 
 

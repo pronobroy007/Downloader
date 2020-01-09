@@ -1,0 +1,6 @@
+bin/
+download/
+obj/
+src/.*~
+src/.*.swp
+src/.*.swo

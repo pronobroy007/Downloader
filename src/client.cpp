@@ -7,7 +7,7 @@ Client::Client()
 
 bool Client::connectServer(std::string ip, std::string port, std::string protocol)
 {
-	this->protocol = protocol;
+	_protocol = protocol;
     //This is for Broke Pipe exception handler for sending to a client which is close.
 	signal(SIGPIPE, SIG_IGN);    
 
@@ -39,26 +39,16 @@ bool Client::connectServer(std::string ip, std::string port, std::string protoco
 
 bool Client::send_req(std::string hostname, std::string port, std::string path)
 {
-	char buffer[2048];
-	bzero(buffer, 2048);
-    sprintf(buffer, "GET /%s HTTP/1.1\r\n", path.c_str());
-    sprintf(buffer + strlen(buffer), "Host: %s:%s\r\n", hostname.c_str(), port.c_str());
-	//Keep-Alive
-    sprintf(buffer + strlen(buffer), "Connection: close\r\n");   
-    sprintf(buffer + strlen(buffer), "User-Agent: honpwc web_get 1.0\r\n");
-    sprintf(buffer + strlen(buffer), "\r\n");
+	bzero(sendBuff, 2048);
+    sprintf(sendBuff, "GET /%s HTTP/1.1\r\n", path.c_str());
+    sprintf(sendBuff + strlen(sendBuff), "Host: %s:%s\r\n", hostname.c_str(), port.c_str());
+    sprintf(sendBuff + strlen(sendBuff), "Connection: close\r\n");   
+    sprintf(sendBuff + strlen(sendBuff), "User-Agent: honpwc web_get 1.0\r\n");
+    sprintf(sendBuff + strlen(sendBuff), "\r\n");
 	
-	//Print Request.
-	std::cout << "**************************************************************"<< std::endl;
-    std::cout << "Rsquest : " << std::endl;
-	std::cout << "---------"<< std::endl;
-	std::cout << buffer << std::endl;
-	std::cout << "**************************************************************"<< std::endl;
-	std::cout << std::endl;
-
 	//Send.........................
-	if(protocol == "http")
-		send(sock, buffer , strlen(buffer), 0);
+	if(_protocol == "http")
+		send(sock, sendBuff , strlen(sendBuff), 0);
 
 	return true;
 }
