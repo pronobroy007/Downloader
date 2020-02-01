@@ -16,10 +16,11 @@ class Downloader : public Client
 		char* body;
 		Parser parser;
 		Response _response;
+        std::string projectDir;
 
 		//Functions.................
-		inline void content_length(int byte_recv);
-		inline void chunked(int byte_recv);
+		inline void content_length();
+		inline void chunked();
 		inline void cleanUp();
 };
 #endif

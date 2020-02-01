@@ -23,7 +23,8 @@ class Client
 		long gb = 1073741824;
 
         int sock;
-		SSL* ssl;
+        SSL_CTX *_ctx;
+        SSL *_ssl;
         struct addrinfo hints;
         struct addrinfo *bind_addr;
 

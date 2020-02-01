@@ -1,4 +1,3 @@
-#include <iostream>
 #include <stdlib.h>
 #include <netdb.h>
 #include <unistd.h>
@@ -7,16 +6,20 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <signal.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
 
+#include <iostream>
 #include <stdio.h>
 #include <string.h>
 #include <map>
 #include <vector>
-#include <unistd.h>
 #include <regex>
-
 #include <sstream>
 #include <fstream>
+
+//OpenSSL
+#include <openssl/crypto.h>
+#include <openssl/x509.h>
+#include <openssl/pem.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
