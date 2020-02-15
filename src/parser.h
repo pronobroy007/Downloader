@@ -10,11 +10,13 @@ class Parser
 {
 	public:
 		Parser();
-			void parse_url(std::string url, std::string &hostname, std::string &port, std::string &path, std::string &protocol, std::string &filename);
-			void parseHeader(std::string header, std::string &fileType, long &fileSize, FILE_ENCODING &encoding);
+			static void parse_url(URL &url);
+			static void parseHeader(Response &response);
 		~Parser();
 	
 	private:
+        static std::string getHeaderElement(std::string str, std::string matchString);
+        static std::string parseHexValue(std::string filename);
 };
 
 

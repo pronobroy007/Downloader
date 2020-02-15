@@ -2,6 +2,7 @@
 #define CLIENT
 
 #include "header.h"
+#include "structure.h"
 
 #define BUFFER_SIZE 32768
 
@@ -9,10 +10,7 @@ class Client
 {
     public:
         Client();
-            bool connectServer(std::string ip, std::string port, std::string protocol);
-			bool send_req(std::string hostname, std::string port, std::string path);
-            void clientClose();
-			float getSize(long number);
+            Response send_head_req(URL &url);
         ~Client();
 
 	protected:
@@ -28,9 +26,12 @@ class Client
         struct addrinfo hints;
         struct addrinfo *bind_addr;
 
-	private:
-		std::string _protocol;
-
+        //Function ...................
+        bool connectServer(std::string ip, std::string port, std::string protocol);
+        int recv_response(std::string protocol, char* ptr, int len);
+        bool send_get_req(URL &url, long byteRange);
+        void clientClose();
+        float getSize(long number);
 };
 
 

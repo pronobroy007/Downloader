@@ -6,60 +6,34 @@ Downloader::Downloader()
     projectDir = "/home/linux/Documents/program/app/downloader/";
 }
 
-bool Downloader::download(std::string url)
+void Downloader::init(std::string address, URL &url)
 {
-	std::string hostname;
-	std::string port;
-	std::string path;
-	std::string protocol;
+	//Parser url...........
+    url.url = address;
+    Parser::parse_url(url);
+	if(url.fileName.empty())
+		url.fileName = "index.html";
+}
 
-	//Parser url..............
-	parser.parse_url(url, hostname, port, path, protocol, _response.fileName);
-	if(_response.fileName.empty())
-		_response.fileName = "index.html";
-    
-	//Print url parse.
-    std::cout << std::endl;
-	std::cout << "**************************************************************"<< std::endl;
-    std::cout << "Protocol : " << protocol << std::endl;
-    std::cout << "URL : " << url << std::endl;
-    std::cout << "Host name : " << hostname << std::endl;
-    std::cout << "Port : " << port << std::endl;
-    std::cout << "Path : " << path << std::endl;
-    std::cout << "File Name : " << _response.fileName << std::endl;
-    std::cout << std::endl;
-	std::cout << std::endl;
-	std::cout << "**************************************************************\n"<< std::endl;
-    
+bool Downloader::download(URL &url, long byteRange)
+{
 	//Connecting to server........................
-	connectServer(hostname, port, protocol);
-    send_req(hostname, port, path);
-
-	
-	//Print Request.
-	std::cout << "**************************************************************"<< std::endl;
-    std::cout << "Rsquest : " << std::endl;
-	std::cout << "---------"<< std::endl;
-	std::cout << sendBuff << std::endl;
-	std::cout << "**************************************************************"<< std::endl;
-	std::cout << std::endl;
-	std::cout << std::endl;
-
+	connectServer(url.hostname, url.port, url.protocol);
+    send_get_req(url, byteRange);
+    
 	//Downloading..............................
-    char *ptr = (char*)recvBuff;
     int p = 0;
+    char *ptr = (char*)recvBuff;
+    _response.fileName = url.fileName;
+
     while (true)
     {
-		int byte_recv;
-
-		usleep(50);
-        if(protocol == "https")
-            byte_recv = SSL_read(_ssl, ptr + p, BUFFER_SIZE - p);
-        else
-			byte_recv = recv(sock, ptr + p, BUFFER_SIZE - p, 0);
-
+		int byte_recv = recv_response(url.protocol, ptr + p, BUFFER_SIZE - p);
         if(byte_recv < 1) 
-           break;
+        {
+            cleanUp(); 
+            return false;
+        }
 	
 		if(_response.encoding == FILE_ENCODING::def)
 		{
@@ -73,39 +47,40 @@ bool Downloader::download(std::string url)
 			if((body = strstr(recvBuff, "\r\n\r\n")))
             {	
                 body += 4;
-				/******************************************************
-				// This function sets "enccoding" type.
-				// also set "byte_write" and "Content_Type"
-				******************************************************/
                 _response.header = std::string(recvBuff);
                 ssize_t index = _response.header.find("\r\n\r\n");
                 _response.header = std::string(recvBuff, 0, index);
-
-				parser.parseHeader(_response.header, _response.fileType, _response.fileSize, _response.encoding);
+				/******************************************************
+                // This function set "fileName" if exist, 
+                // "enccoding" type. also set "byte_write" 
+                // and "Content_Type"
+				******************************************************/
+                Parser::parseHeader(_response);
 				_response.fileSizeShow = getSize(_response.fileSize);
-                
+
+                if(!url.resumeDownload && _response.encoding == FILE_ENCODING::length)
+                {
+                    db.init();
+                    std::vector<std::string> buff;
+                    buff.push_back(url.url);
+                    buff.push_back(std::to_string(_response.fileSize));
+                    buff.push_back(_response.fileName);
+                    buff.push_back("Processing");
+                    std::string sql = "INSERT INTO Tmp(Url, FileSize, FileName, Status) VALUES(?, ?, ?, ?)";
+                    db.prepareStmt(buff,  sql, 0);
+
+                    buff.clear();
+                    sql = "SELECT last_insert_rowid()";
+                    db.prepareStmt(buff,  sql, 1);
+                    url.downloadID = db.data[0][0];
+                    db.close();
+                }
 				/******************************************************/
 				// This many data need to write first time.
 				// Because data and header mixed together.
 				// so get read of header part form actual data.
 				/******************************************************/
 				_response.byte_write = p - (_response.header.size() + 4); 
-                
-				//Printing header.....................
-				std::cout << "**************************************************************"<< std::endl;
-				std::cout << "Header : " << std::endl;
-				std::cout << "----------" << std::endl;
-				std::cout << _response.header << std::endl;
-				std::cout << "**************************************************************\n"<< std::endl;
-				//Printing Response.
-				std::cout << "**************************************************************"<< std::endl;
-				std::cout << "File Type : " << _response.fileType << std::endl;	
-				std::cout << "File Length : " << _response.fileSize << std::endl;
-				std::cout << "Byte write : " << _response.byte_write << std::endl;
-				std::cout << "byte recv : " << byte_recv << std::endl;
-				std::cout << "recvBuff size : " << p << std::endl;
-				std::cout << "header size : " << _response.header.size() << std::endl;
-				std::cout << "**************************************************************\n"<< std::endl;
 			}
 		}
 		else 
@@ -128,15 +103,23 @@ bool Downloader::download(std::string url)
                 case FILE_ENCODING::length:
                 {
                     if(!_response.output.is_open())
-                    {
-                        _response.output.open(projectDir + "/download/" + _response.fileName, std::ios::binary);
-                    }
+                        _response.output.open(_response.fileName, std::ios::binary | std::ios::app);
+                    
                     //Download when file is given as "Content_Length"
                     content_length();
                     
                     //Make sure program end after download.
                     if(_response.totalDownSize >= _response.fileSize)
                     {
+                        //update Database..............
+                        db.init();
+                        std::vector<std::string> buff;
+                        buff.push_back("Done");
+                        buff.push_back(url.downloadID);
+                        std::string sql = "UPDATE Tmp SET status=? WHERE User_ID=?"; 
+                        db.prepareStmt(buff, sql, 0);
+                        db.close();
+
                         cleanUp();
                         return true;
                     }
@@ -146,22 +129,20 @@ bool Downloader::download(std::string url)
                 case FILE_ENCODING::chunked:
                 {
                     if(!_response.output.is_open())
-                    {
-                        _response.output.open(projectDir + "download/" + _response.fileName);
-                    }
+                        _response.output.open(_response.fileName);
+                    
                     //Download when file is given as "Chunked"
                     if(_response.byte_write > 0)
-                        chunked();
+                        if(!chunked(url.protocol))
+                            return false;
                     break;	
                 }
 
                 case FILE_ENCODING::connection:
                 {
                     if(!_response.output.is_open())
-                    {
-                        _response.output.open(projectDir + "download/" + _response.fileName);
-                    }
-                    //Download when file is given as "Chunked"
+                        _response.output.open(_response.fileName);
+                        
                     _response.output.write(body, _response.byte_write); 
                     break;	
                 }
@@ -184,8 +165,6 @@ bool Downloader::download(std::string url)
     std::cout << "File Received !" << std::endl;
     return true;
 }
-
-
 
 
 //******************************************************************************************
@@ -211,7 +190,7 @@ inline void Downloader::content_length()
 
 //..........................................................................................
 
-void Downloader::chunked()
+bool Downloader::chunked(std::string protocol)
 {
     std::string sLen = std::string(body);
     size_t index = sLen.find("\r\n");
@@ -225,7 +204,6 @@ void Downloader::chunked()
     _response.fileSize += 2;
     index += 2;
 
-    //Problem.........................................
     if(_response.byte_write > _response.fileSize)
     {
         //Calculate how may byte need to write.....
@@ -237,7 +215,7 @@ void Downloader::chunked()
         //This is remmining data.
         body += _response.byte_write + index;
         _response.byte_write = extraBit;
-        chunked();
+        chunked(protocol);
     }
     else
     {
@@ -247,25 +225,26 @@ void Downloader::chunked()
 
     while(_response.fileSize > 0)
     {
-        usleep(100);
-        int byte_recv = SSL_read(_ssl, recvBuff, _response.fileSize);
-
+		int byte_recv = recv_response(protocol, recvBuff, _response.fileSize);
         if(byte_recv < 1) 
-           break;
+        {
+            cleanUp(); 
+            return false;
+        }
 
         _response.fileSize -= byte_recv;
         _response.output.write(recvBuff, byte_recv); 
-
     }
+
+    return true;
 }
 
 //******************************************************************************************
-
-inline void Downloader::cleanUp()
+void Downloader::cleanUp()
 {
 	body = 0;
 	_response.clear();
-
+    db.close();
 	std::cout << "Cleaning up ............." << std::endl;
 }
 
@@ -274,5 +253,8 @@ Downloader::~Downloader()
 {
 	body = 0;
 	_response.clear();
+    db.close();
 }
+
+
 

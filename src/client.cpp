@@ -16,7 +16,6 @@ Client::Client()
 
 bool Client::connectServer(std::string ip, std::string port, std::string protocol)
 {
-	_protocol = protocol;
     //This is for Broke Pipe exception handler for sending to a client which is close.
 	signal(SIGPIPE, SIG_IGN);    
 
@@ -43,7 +42,7 @@ bool Client::connectServer(std::string ip, std::string port, std::string protoco
     freeaddrinfo(bind_addr); 
 
 	//For HTTPS connection...............................
-	if(_protocol == "https")
+	if(protocol == "https")
 	{
 		/*
 		* Make TLS cnnection :
@@ -146,26 +145,108 @@ bool Client::connectServer(std::string ip, std::string port, std::string protoco
 }
 
 
+int Client::recv_response(std::string protocol, char* ptr, int len)
+{
+    int byte_recv = 0;
+    usleep(50);
+    if(protocol == "https")
+        byte_recv = SSL_read(_ssl, ptr, len);
+    else
+        byte_recv = recv(sock, ptr, len, 0);
+
+    if(byte_recv < 1) 
+        return 0;
+
+    return byte_recv;
+}
 
 
-bool Client::send_req(std::string hostname, std::string port, std::string path)
+bool Client::send_get_req(URL &url, long byteRange)
 {
 	bzero(sendBuff, 2048);
-    sprintf(sendBuff, "GET /%s HTTP/1.1\r\n", path.c_str());
-    sprintf(sendBuff + strlen(sendBuff), "Host: %s:%s\r\n", hostname.c_str(), port.c_str());
+    sprintf(sendBuff, "GET /%s HTTP/1.1\r\n", url.path.c_str());
+    sprintf(sendBuff + strlen(sendBuff), "Host: %s:%s\r\n", url.hostname.c_str(), url.port.c_str());
     sprintf(sendBuff + strlen(sendBuff), "Connection: close\r\n");   
     sprintf(sendBuff + strlen(sendBuff), "User-Agent: honpwc https_get 1.0\r\n");
+    //Range: bytes=5000-    It mean from 5000 to rest.
+    sprintf(sendBuff + strlen(sendBuff), "Range: bytes=%d-\r\n", byteRange);
     sprintf(sendBuff + strlen(sendBuff), "\r\n");
+	//Print Request.
+	std::cout << "**************************************************************"<< std::endl;
+    std::cout << "Rsquest : " << std::endl;
+	std::cout << "---------"<< std::endl;
+	std::cout << sendBuff << std::endl;
+	std::cout << "**************************************************************"<< std::endl;
+	std::cout << std::endl;
+	std::cout << std::endl;
+
 	
 	//Send.........................
-	if(_protocol == "http")
+	if(url.protocol == "http")
 		send(sock, sendBuff, strlen(sendBuff), 0);
-    else if(_protocol == "https")
+    else if(url.protocol == "https")
     {
         SSL_write(_ssl, sendBuff, sizeof(sendBuff));
         std::cout << "Send ssl" << std::endl; 
     }
+    
 	return true;
+}
+
+Response Client::send_head_req(URL &url)
+{
+    //Connecting to server............
+	connectServer(url.hostname, url.port, url.protocol);
+
+	bzero(sendBuff, 2048);
+    sprintf(sendBuff, "HEAD /%s HTTP/1.1\r\n", url.path.c_str());
+    sprintf(sendBuff + strlen(sendBuff), "Host: %s:%s\r\n", url.hostname.c_str(), url.port.c_str());
+    sprintf(sendBuff + strlen(sendBuff), "Connection: close\r\n");   
+    sprintf(sendBuff + strlen(sendBuff), "User-Agent: honpwc https_get 1.0\r\n");
+    sprintf(sendBuff + strlen(sendBuff), "\r\n");
+	//Print Request.
+	std::cout << "**************************************************************"<< std::endl;
+    std::cout << "Rsquest : " << std::endl;
+	std::cout << "---------"<< std::endl;
+	std::cout << sendBuff << std::endl;
+	std::cout << "**************************************************************"<< std::endl;
+	std::cout << std::endl;
+	std::cout << std::endl;
+	
+	//Send.........................
+	if(url.protocol == "http")
+		send(sock, sendBuff, strlen(sendBuff), 0);
+    else if(url.protocol == "https")
+    {
+        SSL_write(_ssl, sendBuff, sizeof(sendBuff));
+        std::cout << "Send ssl" << std::endl; 
+    }
+
+	//Downloading..............................
+    Response response;
+    response.fileName = url.fileName;
+
+    char *ptr = (char*)recvBuff;
+    int p = 0;
+    while (true)
+    {
+		int byte_recv = recv_response(url.protocol, ptr + p, BUFFER_SIZE - p);
+        if(byte_recv < 1) 
+           break;
+	
+        //This is because header may not come in onec.
+        p += byte_recv;
+
+        if((strstr(recvBuff, "\r\n\r\n")))
+        {	
+            response.header = std::string(recvBuff);
+            ssize_t index = response.header.find("\r\n\r\n");
+            response.header = std::string(recvBuff, 0, index);
+        }
+    }
+    
+    //std::cout << response.header << std::endl;
+	return response;
 }
 
 
